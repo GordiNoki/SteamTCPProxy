@@ -2,6 +2,7 @@
 using Steamworks.Data;
 using System.Net;
 using System.Net.Sockets;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace SteamTCPProxy
 {
@@ -15,25 +16,22 @@ namespace SteamTCPProxy
                 tcpEndPoint = IPEndPoint.Parse("127.0.0.1:" + value);
             }
         }
+        static public Lobby lobby;
         public event Action? closeEvent;
         readonly Dictionary<SteamId, Dictionary<int, System.Net.Sockets.Socket>> proxiedSockets = [];
         readonly Dictionary<SteamId, Connection> connections = [];
 
         public override void OnConnecting(Connection connection, ConnectionInfo data)
         {
-            if (!data.Identity.IsSteamId)
-            {
-                connection.Close(false, 0, "Non relay connection");
-                return;
-            }
             connection.Accept();
         }
 
         public override void OnConnected(Connection connection, ConnectionInfo data)
         {
-            Console.WriteLine($"{data.Identity} has connected");
-            proxiedSockets.Add(data.Identity.SteamId, []);
-            connections.Add(data.Identity.SteamId, connection);
+            if (data.Identity.IsSteamId) {
+                proxiedSockets.Add(data.Identity.SteamId, []);
+                connections.Add(data.Identity.SteamId, connection);
+            }
             base.OnConnected(connection, data); // Adds connection to poll group
         }
 
@@ -54,6 +52,17 @@ namespace SteamTCPProxy
 
         public override void OnMessage(Connection connection, NetIdentity identity, IntPtr inMessagePtr, int size, long messageNum, long recvTime, int channel)
         {
+            if (!identity.IsSteamId)
+            {
+                connection.Close(false, 0, "Non relay connection");
+                return;
+            }
+            if(!connections.ContainsKey(identity.SteamId))
+            {
+                connections.Add(identity.SteamId, connection);
+                proxiedSockets.Add(identity.SteamId, []);
+            }
+
             var inMessage = SteamProxyMessage.FromPtr(inMessagePtr);
             switch(inMessage.Type)
             {
@@ -94,8 +103,10 @@ namespace SteamTCPProxy
                     break;
 
                 case SteamProxyMessageType.CLOSE_SESSION:
-                    proxiedSockets[identity.SteamId][inMessage.SessionId].Close();
-                    proxiedSockets[identity.SteamId].Remove(inMessage.SessionId);
+                    if (proxiedSockets[identity.SteamId].TryGetValue(inMessage.SessionId, out var oldSocket)) {
+                        oldSocket.Close();
+                        proxiedSockets[identity.SteamId].Remove(inMessage.SessionId);
+                    }
                     break;
             }
         }

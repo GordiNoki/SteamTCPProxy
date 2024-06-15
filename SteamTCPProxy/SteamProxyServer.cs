@@ -17,6 +17,7 @@ namespace SteamTCPProxy
             lobby = lobbyResult.Value;
             lobby.SetFriendsOnly();
             lobby.SetPublic();
+
             Console.WriteLine(lobby.Id);
 
             SteamServerSocketManager.TcpPort = port;

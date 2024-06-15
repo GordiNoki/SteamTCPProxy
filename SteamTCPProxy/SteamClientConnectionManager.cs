@@ -40,7 +40,7 @@ namespace SteamTCPProxy
         {
             Console.WriteLine("Disconnected from server.");
             Console.WriteLine(info.EndReason);
-            foreach(var socket in proxiedSockets.Values)
+            foreach (var socket in proxiedSockets.Values)
             {
                 socket.Close();
             }
@@ -61,7 +61,23 @@ namespace SteamTCPProxy
                     break;
 
                 case SteamProxyMessageType.MESSAGE:
-                    proxiedSockets[inMessage.SessionId].Send(inMessage.Data);
+                    try
+                    {
+                        proxiedSockets[inMessage.SessionId].Send(inMessage.Data);
+                    }
+                    catch (SocketException) 
+                    {
+                        proxiedSockets[inMessage.SessionId].Close();
+
+                        SteamProxyMessage outMessage = new()
+                        {
+                            Type = SteamProxyMessageType.CLOSE_SESSION,
+                            SessionId = inMessage.SessionId
+                        };
+                        Connection.SendMessage(outMessage.ToArray());
+
+                        proxiedSockets.Remove(inMessage.SessionId);
+                    }
                     break;
 
                 case SteamProxyMessageType.CLOSE_SESSION:
