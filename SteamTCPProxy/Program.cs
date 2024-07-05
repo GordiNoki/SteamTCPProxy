@@ -13,38 +13,34 @@ namespace SteamTCPProxy
                 return;
             }
 
-            try
-            {
-                SteamClient.Init(480, true);
-            }
-            catch (Exception e)
-            {
-                Console.Error.WriteLine("Failed to initialize Steam: " + e.Message);
+            if (!SteamAPI.Init()) {
+                Console.Error.WriteLine("Failed to initialize Steam");
                 return;
             }
 
             SteamNetworkingUtils.InitRelayNetworkAccess();
 
-            Console.WriteLine($"Hello, {SteamClient.Name}! ({SteamClient.SteamId})");
+            Console.WriteLine($"Hello, {SteamFriends.GetPersonaName()}! ({SteamUser.GetSteamID()})");
 
             ISteamProxyRunner runner;
             if (args[1] == "client")
             {
+                Console.WriteLine("Using client on port: " + port);
                 runner = new SteamProxyClient(port);
             }
             else
             {
+                Console.WriteLine("Using server on port: " + port);
                 runner = new SteamProxyServer(port);
             }
-            Task.Run(() => runner.RunAsync());
 
             while (runner.IsAlive)
             {
-                SteamClient.RunCallbacks();
+                SteamAPI.RunCallbacks();
                 runner.Update();
             }
 
-            SteamClient.Shutdown();
+            SteamAPI.Shutdown();
         }
     }
 }

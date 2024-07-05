@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using Steamworks;
+using System.Runtime.InteropServices;
 
 namespace SteamTCPProxy
 {
@@ -36,6 +37,19 @@ namespace SteamTCPProxy
             }
 
             return message;
+        }
+
+        public void SendMessage(HSteamNetConnection connection) => SendMessage(connection, this);
+        public static void SendMessage(HSteamNetConnection connection, SteamProxyMessage message)
+        {
+            var bytes = message.ToArray();
+            GCHandle handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
+            var res = EResult.k_EResultLimitExceeded;
+            while (res == EResult.k_EResultLimitExceeded) {
+                SteamNetworkingSockets.FlushMessagesOnConnection(connection);
+                res = SteamNetworkingSockets.SendMessageToConnection(connection, handle.AddrOfPinnedObject(), (uint)bytes.Length, Constants.k_nSteamNetworkingSend_Reliable, out _);
+            }
+            handle.Free();
         }
     }
 
